@@ -32,3 +32,5 @@ services:
     plan: free
     name: chat_channel_layer
     region: Oregon, USA
+    ipAllowlist:
+      - source: 0.0.0.0/0
