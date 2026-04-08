@@ -12,7 +12,7 @@ services:
     region: oregon
     runtime: python
     buildCommand: './build.sh'
-    startCommand: 'python -m daphne chat_project.asgi:application'
+    startCommand: 'python -m daphne -b 0.0.0.0 -p 8000 chat_project.asgi:application'
     envVars:
       - key: DATABASE_URL
         fromDatabase:
