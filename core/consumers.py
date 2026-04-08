@@ -40,7 +40,6 @@ class ChatConsumer(WebsocketConsumer):
         message_obj = Message.objects.create(room=self.room, user=self.user, content=message)
         context = {"message": message_obj}
         text_data = render_to_string("partials/message.html", context)
-        # self.send(text_data=text_data)
         async_to_sync(self.channel_layer.group_send)(
             self.room_group_name, {"type": "chat.message", "message": text_data}
         )

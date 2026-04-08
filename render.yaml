@@ -1,0 +1,36 @@
+databases:
+  - name: chat_project_db
+    plan: free
+    databaseName: chat_project
+    user: mysite
+    region: Oregon, USA
+
+services:
+  - type: web
+    plan: free
+    name: chat_project
+    region: Oregon, USA
+    runtime: python
+    buildCommand: './build.sh'
+    startCommand: 'python -m daphne chat_project.asgi:application'
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: chat_project_db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: chat_channel_layer
+          type: keyvalue
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: WEB_CONCURRENCY
+        value: 4
+
+  - type: keyvalue
+    plan: free
+    name: chat_channel_layer
+    region: Oregon, USA
+    ipAllowlist:
+      - source: 0.0.0.0/0
