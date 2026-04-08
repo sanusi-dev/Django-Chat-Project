@@ -11,9 +11,6 @@ services:
     name: chat_project
     region: Oregon, USA
     runtime: python
-    ipAllowlist:
-      - source: 0.0.0.0/0
-        description: everywhere
     buildCommand: './build.sh'
     startCommand: 'python -m daphne chat_project.asgi:application'
     envVars:
