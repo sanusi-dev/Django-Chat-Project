@@ -3,7 +3,7 @@ databases:
     plan: free
     databaseName: chat_project
     user: mysite
-    region: Oregon, USA
+    region: oregon
 
 services:
   - type: web
