@@ -1,48 +1,57 @@
 import json
-
-from channels.generic.websocket import WebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.db import database_sync_to_async
 from django.template.loader import render_to_string
 from .models import Room, Message
-from asgiref.sync import async_to_sync
 
-
-class ChatConsumer(WebsocketConsumer):
-    def connect(self):
-        self.room = self.get_room()
+class ChatConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.room_slug = self.scope["url_route"]["kwargs"]["room_slug"]
+        # Use database_sync_to_async for the DB lookup
+        self.room = await self.get_room(self.room_slug)
+        
         if not self.room:
-            self.close()
+            await self.close()
             return
         
-        self.room_group_name = f"chat_{self.room.slug}"
+        self.room_group_name = f"chat_{self.room_slug}"
+        self.user = self.scope["user"]
 
-        async_to_sync(self.channel_layer.group_add)(
+        # Directly await channel layer operations
+        await self.channel_layer.group_add(
             self.room_group_name, self.channel_name
         )
 
-        self.user = self.scope["user"]
-        self.accept()
+        await self.accept()
 
-    def get_room(self):
-        self.room_slug = self.scope["url_route"]["kwargs"]["room_slug"]
+    @database_sync_to_async
+    def get_room(self, slug):
         try:
-            return Room.objects.get(slug=self.room_slug)
+            return Room.objects.get(slug=slug)
         except Room.DoesNotExist:
             return None
 
-    def disconnect(self, close_code):
-        async_to_sync(self.channel_layer.group_discard)(
-            self.room_group_name, self.channel_name
-        )
+    async def disconnect(self, close_code):
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name, self.channel_name
+            )
 
-    def receive(self, text_data):
+    async def receive(self, text_data):
         text_data_json = json.loads(text_data)
-        message = text_data_json["message"]
-        message_obj = Message.objects.create(room=self.room, user=self.user, content=message)
-        context = {"message": message_obj}
-        text_data = render_to_string("partials/message.html", context)
-        async_to_sync(self.channel_layer.group_send)(
-            self.room_group_name, {"type": "chat.message", "message": text_data}
+        message_text = text_data_json["message"]
+        
+        # Save message and render HTML in a separate thread
+        html = await self.save_and_render_message(message_text)
+
+        await self.channel_layer.group_send(
+            self.room_group_name, {"type": "chat.message", "message": html}
         )
 
-    def chat_message(self, event):
-        self.send(text_data=event["message"])
+    @database_sync_to_async
+    def save_and_render_message(self, content):
+        message_obj = Message.objects.create(room=self.room, user=self.user, content=content)
+        return render_to_string("partials/message.html", {"message": message_obj})
+
+    async def chat_message(self, event):
+        await self.send(text_data=event["message"])
